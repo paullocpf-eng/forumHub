@@ -47,33 +47,27 @@ public class TopicoController {
 
     @GetMapping("/{id}")
     public ResponseEntity detalhar(@PathVariable Long id) {
-        var topicoOptional = repository.findById(id);
-
-        if (topicoOptional.isPresent()) {
-            return ResponseEntity.ok(new DadosDetalhamentoTopico(topicoOptional.get()));
-        }
-        // Se o ID não for encontrado retorna erro HTTP 404 Not Found
-        return ResponseEntity.notFound().build();
+        // getReferenceById lança EntityNotFoundException se o ID não existir
+        var topico = repository.getReferenceById(id);
+        return ResponseEntity.ok(new DadosDetalhamentoTopico(topico));
     }
 
     @PutMapping("/{id}")
     @Transactional
     public ResponseEntity atualizar(@PathVariable Long id, @RequestBody @Valid DadosAtualizacaoTopico dados) {
-        // Verifica se o ID existe
-        var topicoOptional = repository.findById(id);
-        if (!topicoOptional.isPresent()) {
-            return ResponseEntity.notFound().build();
+        if (!repository.existsById(id)) {
+            throw new jakarta.persistence.EntityNotFoundException();
         }
 
-        var topico = topicoOptional.get();
+        var topico = repository.getReferenceById(id);
 
-        // Verifica se ja existe outro topico igual
         if (dados.titulo() != null && dados.mensagem() != null) {
             var existeDuplicado = repository.findByTituloAndMensagem(dados.titulo(), dados.mensagem());
             if (existeDuplicado.isPresent() && !existeDuplicado.get().getId().equals(id)) {
                 return ResponseEntity.badRequest().body("Já existe outro tópico com o mesmo título e mensagem.");
             }
         }
+
         topico.atualizarInformacoes(dados);
         return ResponseEntity.ok(new DadosDetalhamentoTopico(topico));
     }
@@ -81,16 +75,10 @@ public class TopicoController {
     @DeleteMapping("/{id}")
     @Transactional
     public ResponseEntity excluir(@PathVariable Long id) {
-        // Busca o tópico no banco para verificar se ele existe
-        var topicoOptional = repository.findById(id);
-
-        // Verifica se está presente (conforme as regras)
-        if (topicoOptional.isPresent()) {
-            repository.deleteById(id); // Deleta do banco de dados
-            return ResponseEntity.noContent().build(); // Retorna 204 (Sucesso, sem conteúdo)
+        if (!repository.existsById(id)) {
+            throw new jakarta.persistence.EntityNotFoundException();
         }
-
-        // Se não existir, retorna 404 Not Found
-        return ResponseEntity.notFound().build();
+        repository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 }
